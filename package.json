@@ -1,0 +1,13 @@
+{
+  "name": "stackblitz-starters-jwwiu1ue",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "mssql": "^10.0.1"
+  }
+}
