@@ -84,6 +84,83 @@ app.get('/api/clientes', async (req, res) => {
   }
 });
 
+// LOTES por cabina
+app.get('/api/lotes/:cabina', async (req, res) => {
+    try {
+        const cabina = req.params.cabina;
+        const pool = await getPool();
+        if (!pool) {
+            // Mock sin DB
+            return res.json([
+                { IdLote: 101, Cabina: cabina, Estado: 'Programado', ProgramadoPara: '2025-08-12 09:00' },
+                { IdLote: 102, Cabina: cabina, Estado: 'En curso', ProgramadoPara: '2025-08-12 10:00' }
+            ]);
+        }
+        const r = await pool.request()
+            .input('cabina', sql.VarChar, cabina)
+            .query(`
+        SELECT IdLote, Cabina, Estado, ProgramadoPara
+        FROM Lotes
+        WHERE Cabina = @cabina
+        ORDER BY ProgramadoPara DESC
+      `);
+        res.json(r.recordset);
+    } catch (err) {
+        console.error('GET /api/lotes error:', err);
+        res.status(500).json({ error: 'db_error' });
+    }
+});
+
+// Registrar PESAJE
+app.post('/api/pesajes', async (req, res) => {
+    try {
+        const { lote, peso } = req.body || {};
+        if (!lote || typeof peso !== 'number') {
+            return res.status(400).json({ error: 'bad_request' });
+        }
+        const pool = await getPool();
+        if (!pool) {
+            // Mock sin DB
+            return res.status(201).json({ ok: true, id: Date.now(), lote, peso });
+        }
+        const r = await pool.request()
+            .input('lote', sql.Int, lote)
+            .input('peso', sql.Decimal(18, 3), peso)
+            .query(`
+        INSERT INTO Pesajes (IdLote, Peso)
+        OUTPUT INSERTED.Id AS id
+        VALUES (@lote, @peso)
+      `);
+        res.status(201).json({ ok: true, ...r.recordset[0] });
+    } catch (err) {
+        console.error('POST /api/pesajes error:', err);
+        res.status(500).json({ error: 'db_error' });
+    }
+});
+
+// (Opcional) listar pesajes por lote
+app.get('/api/pesajes', async (req, res) => {
+    try {
+        const { lote } = req.query;
+        const pool = await getPool();
+        if (!pool) {
+            return res.json([{ Id: 1, IdLote: Number(lote) || 101, Peso: 12.345, Fecha: '2025-08-12T09:15:00Z' }]);
+        }
+        const r = await pool.request()
+            .input('lote', sql.Int, Number(lote) || 0)
+            .query(`
+        SELECT Id, IdLote, Peso, Fecha
+        FROM Pesajes
+        ${lote ? 'WHERE IdLote = @lote' : ''}
+        ORDER BY Fecha DESC
+      `);
+        res.json(r.recordset);
+    } catch (err) {
+        console.error('GET /api/pesajes error:', err);
+        res.status(500).json({ error: 'db_error' });
+    }
+});
+
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
