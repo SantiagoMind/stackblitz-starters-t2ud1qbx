@@ -306,30 +306,85 @@ app.get('/lotesprogramados', asyncHandler(async (req, res) => {
       FROM ProgramacionProduccion a
       LEFT JOIN ProgramacionProduccion_Control b ON a.Consecutivo = b.Consecutivo 
       WHERE CAST(FechaProgramada AS DATE) BETWEEN @inicio AND @fin
-        AND ISNULL(LoteCompletado, 0) = 0
+        AND ISNULL(b.LoteCompletado, 0) = 0
+        AND ISNULL(a.Cancelado, 0) = 0
       ORDER BY Consecutivo;
     `);
   res.json(r.recordset);
 }));
 
-// POST /lotesprogramados/programar → { mensaje } (201)  :contentReference[oaicite:14]{index=14}
-app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
-  const { CodigoProducto, FechaProgramada, UsuarioProgramo, CantidadLotes, PesoPorLote } = req.body || {};
-  if (!CodigoProducto || !FechaProgramada || !UsuarioProgramo || !CantidadLotes || !PesoPorLote) {
-    return res.status(400).json({ mensaje: '❌ Error al programar', detalle: 'Parámetros incompletos' });
-  }
+app.get('/unidadesdemedida/activas', asyncHandler(async (req, res) => {
   const pool = await getPool();
-  if (!pool) return res.status(201).json({ mensaje: '✅ Lotes programados correctamente' });
+  if (!pool) return res.json([
+    { Identificador: 1, UnidaddeMedida: 'Kilogramos', Abreviatura: 'kg' },
+    { Identificador: 2, UnidaddeMedida: 'Gramos',     Abreviatura: 'g'  },
+    { Identificador: 3, UnidaddeMedida: 'Libras',     Abreviatura: 'lb' }
+  ]);
 
+  const rows = await pool.request().query(`
+    SELECT Identificador, UnidaddeMedida, Abreviatura
+    FROM dbo.UnidadesDeMedida
+    WHERE Activo = 1
+    ORDER BY Identificador
+  `);
+  res.json(rows.recordset || []);
+}));
+
+
+
+// POST /lotesprogramados/programar → { mensaje } (201)  :contentReference[oaicite:14]{index=14}
+// POST /lotesprogramados/programar  (con unidad de medida)
+app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
+  const {
+    CodigoProducto,
+    FechaProgramada,
+    UsuarioProgramo,
+    CantidadLotes,
+    PesoPorLote,
+    UnidadMedidaId,   // nombre preferido desde el front
+    IdUnidadMedida    // alias aceptado
+  } = req.body || {};
+
+  // Normaliza unidad (acepta ambos nombres)
+  const unidadId = Number(UnidadMedidaId ?? IdUnidadMedida);
+
+  // Validaciones mínimas (directas y sin rodeos)
+  if (!CodigoProducto || !FechaProgramada || !UsuarioProgramo ||
+      !CantidadLotes || !PesoPorLote || !Number.isFinite(unidadId) || unidadId <= 0) {
+    return res.status(400).json({ mensaje: '❌ Error al programar', detalle: 'Parámetros incompletos o inválidos' });
+  }
+
+  const pool = await getPool();
+  if (!pool) {
+    // Sin conexión real: simula ok para no bloquear pruebas de front
+    return res.status(201).json({ mensaje: '✅ Lotes programados correctamente (sin pool)' });
+  }
+
+  // (Opcional pero recomendable) Valida que la unidad exista y esté activa
+  const um = await pool.request()
+    .input('Id', sql.Int, unidadId)
+    .query(`
+      SELECT 1
+      FROM dbo.UnidadesDeMedida
+      WHERE Activo = 1 AND Identificador = @Id
+    `);
+  if ((um.recordset || []).length === 0) {
+    return res.status(400).json({ mensaje: '❌ Unidad de medida inválida o inactiva' });
+  }
+
+  // Ejecuta el SP con el nuevo parámetro @IdUnidadMedida
   await pool.request()
-    .input('CodigoProducto', sql.NVarChar, String(CodigoProducto))
+    .input('CodigoProducto',  sql.NVarChar, String(CodigoProducto))
     .input('FechaProgramada', sql.DateTime, new Date(FechaProgramada))
     .input('UsuarioProgramo', sql.NVarChar, String(UsuarioProgramo))
-    .input('CantidadLotes', sql.Int, Number(CantidadLotes))
-    .input('PesoPorLote', sql.Decimal(18, 3), Number(PesoPorLote))
+    .input('CantidadLotes',   sql.Int,      parseInt(CantidadLotes, 10))
+    .input('PesoPorLote',     sql.Decimal(18, 3), Number(PesoPorLote))
+    .input('IdUnidadMedida',  sql.Int,      unidadId)
     .execute('SP_ProgramarLotesProduccion');
+
   res.status(201).json({ mensaje: '✅ Lotes programados correctamente' });
 }));
+
 
 // GET /lotesprogramados/detallelote?consecutivo=... → { detalle, maxSecuencia }  :contentReference[oaicite:15]{index=15}
 app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
@@ -387,6 +442,80 @@ app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
     detalle: det.recordset[0] || null,
     maxSecuencia: max.recordset[0]?.maxSecuencia ?? 0
   });
+}));
+
+
+// POST /lotesprogramados/eliminar → { eliminados, rowsAffected }
+app.post('/lotesprogramados/eliminar', asyncHandler(async (req, res) => {
+  const consecutivos = Array.isArray(req.body?.consecutivos) ? req.body.consecutivos : [];
+  const ids = [...new Set(consecutivos.map(n => Number(n)).filter(n => Number.isInteger(n) && n > 0))];
+  if (ids.length === 0) return res.status(400).json({ mensaje: 'consecutivos_required' });
+
+  const pool = await getPool();
+  if (!pool) return res.json({ eliminados: ids.length, rowsAffected: [0], mock: true });
+
+  const reqDb = pool.request();
+  const names = ids.map((id, i) => { const nm = `id${i}`; reqDb.input(nm, sql.BigInt, id); return `@${nm}`; });
+  const inList = names.join(',');
+
+  const q = `
+    UPDATE ProgramacionProduccion SET Cancelado = 1 WHERE Consecutivo IN (${inList});
+  `;
+  const r = await reqDb.query(q);
+  res.json({ eliminados: ids.length, rowsAffected: r.rowsAffected });
+}));
+
+// DELETE /lotesprogramados/:consecutivo → { ok: true }
+app.delete('/lotesprogramados/:consecutivo', asyncHandler(async (req, res) => {
+  const consecutivo = Number(req.params.consecutivo);
+  if (!Number.isInteger(consecutivo) || consecutivo <= 0) {
+    return res.status(400).json({ mensaje: 'consecutivo_required' });
+  }
+
+  const pool = await getPool();
+  if (!pool) return res.json({ ok: true, rowsAffected: [0], mock: true });
+
+  const r = await pool.request()
+    .input('id', sql.BigInt, consecutivo)
+    .query(`
+      UPDATE ProgramacionProduccion SET Cancelado = 1 WHERE Consecutivo = @id;
+    `);
+
+  res.json({ ok: true, rowsAffected: r.rowsAffected });
+}));
+
+
+// POST /lotesprogramados/eliminar-rango → { eliminados }
+app.post('/lotesprogramados/eliminar-rango', asyncHandler(async (req, res) => {
+  const inicioRaw = req.body?.inicio || req.query?.inicio;
+  const finRaw = req.body?.fin || req.query?.fin;
+  if (!inicioRaw || !finRaw) {
+    return res.status(400).json({ mensaje: 'inicio_fin_required' });
+  }
+  const inicio = new Date(String(inicioRaw));
+  const fin = new Date(String(finRaw));
+  if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+    return res.status(400).json({ mensaje: 'invalid_dates' });
+  }
+
+  const pool = await getPool();
+  if (!pool) return res.json({ eliminados: 0, mock: true });
+
+  const r = await pool.request()
+    .input('inicio', sql.DateTime, inicio)
+    .input('fin', sql.DateTime, fin)
+    .query(`
+      UPDATE a
+      SET a.Cancelado = 1
+      FROM ProgramacionProduccion a
+      INNER JOIN ProgramacionProduccion_Control b ON a.Consecutivo = b.Consecutivo
+      WHERE CAST(b.FechaProgramada AS DATE) BETWEEN @inicio AND @fin
+     AND ISNULL(b.LoteCompletado, 0) = 0
+        AND b.ProduccionInicio IS NULL
+        AND ISNULL(a.Cancelado, 0) = 0;
+    `);
+
+  res.json({ eliminados: Array.isArray(r.rowsAffected) ? (r.rowsAffected[0] || 0) : 0 });
 }));
 
 // ============================================================
