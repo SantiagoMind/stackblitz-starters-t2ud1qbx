@@ -427,7 +427,6 @@ app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
       LEFT JOIN ProgramacionProduccion_Control b ON a.Consecutivo = b.Consecutivo
       LEFT JOIN ProgramacionProduccion_Detalle c ON a.Consecutivo = c.Consecutivo
       LEFT JOIN Ingredientes i ON c.Ingrediente = i.Identificador
-      LEFT JOIN ProductosTerminados pt ON a.Producto = pt.CodigoProducto
       WHERE a.Consecutivo = @Consecutivo
         AND c.TiempoDePesado IS NULL
       ORDER BY c.Secuencia;
@@ -651,7 +650,7 @@ app.post('/api/ProductosTerminados/nuevo', asyncHandler(async (req, res) => {
         .input('CodigoProducto', sql.NVarChar, Codigo)
         .input('Num', sql.Int, num++)
         .input('Ingrediente', sql.NVarChar, String(ing.Clave))
-        .input('Porcentaje', sql.Decimal(18, 6), Number(ing.Porcentaje))
+        .input('Porcentaje', sql.Decimal(18, 5), String(ing.Porcentaje)) // ← solo precisión/valor
         .input('Comentario', sql.NVarChar, ing.Comentario ?? null)
         .query(`
           INSERT INTO ProductosTerminados_Detalle (CodigoProducto, NumIngrediente, Ingrediente, Porcentaje, Comentario)
@@ -707,7 +706,7 @@ app.put('/api/ProductosTerminados/editar/:codigo', asyncHandler(async (req, res)
         .input('CodigoProducto', sql.NVarChar, codigo)
         .input('Num', sql.Int, num++)
         .input('Ingrediente', sql.NVarChar, String(ing.Clave))
-        .input('Porcentaje', sql.Decimal(18, 6), Number(ing.Porcentaje))
+        .input('Porcentaje', sql.Decimal(18, 5), String(ing.Porcentaje)) // ← solo precisión/valor
         .input('Comentario', sql.NVarChar, ing.Comentario ?? null)
         .query(`
           INSERT INTO ProductosTerminados_Detalle (CodigoProducto, NumIngrediente, Ingrediente, Porcentaje, Comentario)
@@ -768,7 +767,7 @@ app.get('/api/ProductosTerminados/detalle/:codigo', asyncHandler(async (req, res
   const codigo = String(req.params.codigo);
   const pool = await getPool();
   if (!pool) {
-    return res.json([{ Clave: '1', Nombre: 'Azúcar', Porcentaje: 50.0, Comentario: '' }]);
+    return res.json([{ Clave: '1', Nombre: 'Azúcar', Porcentaje: '50.00000', Comentario: '' }]);
   }
   const r = await pool.request()
     .input('codigo', sql.NVarChar, codigo)
@@ -776,7 +775,7 @@ app.get('/api/ProductosTerminados/detalle/:codigo', asyncHandler(async (req, res
       SELECT 
         pd.Ingrediente AS Clave,
         i.Ingrediente AS Nombre,
-        pd.Porcentaje AS Porcentaje,
+        CONVERT(VARCHAR(32), CONVERT(DECIMAL(18,5), pd.Porcentaje)) AS Porcentaje,
         ISNULL(pd.Comentario, '') AS Comentario
       FROM ProductosTerminados_Detalle pd
       LEFT JOIN Ingredientes i ON pd.Ingrediente = i.Identificador
