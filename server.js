@@ -1,7 +1,4 @@
 // server.js — API consolidada (monolito) para Render (ESM, Node 18+)
-// ------------------------------------------------------------------
-// Estilo y utilidades basados en tu server.js original: pool MSSQL reutilizable,
-// asyncHandler, /health, API key opcional y modo MOCK si faltan ENV. :contentReference[oaicite:3]{index=3}
 
 import express from 'express';
 import morgan from 'morgan';
@@ -71,7 +68,6 @@ app.get('/health', asyncHandler(async (req, res) => {
 // ============================================================
 // ===============  CLIENTES (ClientesController)  ============
 // ============================================================
-// GET api/Clientes/activos → [{ identificador, cliente }]  :contentReference[oaicite:4]{index=4}
 app.get('/api/Clientes/activos', asyncHandler(async (req, res) => {
   const pool = await getPool();
   if (!pool) {
@@ -92,7 +88,6 @@ app.get('/api/Clientes/activos', asyncHandler(async (req, res) => {
 // ============================================================
 // ============  INGREDIENTES (IngredientesController)  =======
 // ============================================================
-// GET api/Ingredientes/categorias → [{ Id, Nombre }]  :contentReference[oaicite:5]{index=5}
 app.get('/api/Ingredientes/categorias', asyncHandler(async (req, res) => {
   const pool = await getPool();
   if (!pool) return res.json([{ Id: 1, Nombre: 'Base' }]);
@@ -104,7 +99,6 @@ app.get('/api/Ingredientes/categorias', asyncHandler(async (req, res) => {
   res.json(r.recordset);
 }));
 
-// GET api/Ingredientes/proveedores → [{ Id, Nombre }]  :contentReference[oaicite:6]{index=6}
 app.get('/api/Ingredientes/proveedores', asyncHandler(async (req, res) => {
   const pool = await getPool();
   if (!pool) return res.json([{ Id: 1, Nombre: 'Proveedor Demo' }]);
@@ -116,7 +110,6 @@ app.get('/api/Ingredientes/proveedores', asyncHandler(async (req, res) => {
   res.json(r.recordset);
 }));
 
-// GET api/Ingredientes/listado?nombre&categoriaId&estado → [{ Id, Nombre, Activo, Categoria, Descripcion }]  :contentReference[oaicite:7]{index=7}
 app.get('/api/Ingredientes/listado', asyncHandler(async (req, res) => {
   const { nombre = null, categoriaId = null, estado = null } = req.query;
   const pool = await getPool();
@@ -151,7 +144,6 @@ app.get('/api/Ingredientes/listado', asyncHandler(async (req, res) => {
   res.json(r.recordset);
 }));
 
-// POST api/Ingredientes/nuevo → { mensaje, id } (201)  :contentReference[oaicite:8]{index=8}
 app.post('/api/Ingredientes/nuevo', asyncHandler(async (req, res) => {
   const data = req.body || {};
   const { Nombre, Descripcion = '', CategoriaId, Activo } = data;
@@ -164,7 +156,6 @@ app.post('/api/Ingredientes/nuevo', asyncHandler(async (req, res) => {
     return res.status(201).json({ mensaje: 'Ingrediente registrado correctamente', id: Date.now() });
   }
 
-  // Validar duplicado
   const dup = await pool.request()
     .input('nombre', sql.NVarChar, Nombre)
     .query(`SELECT COUNT(*) AS c FROM Ingredientes WHERE Ingrediente = @nombre;`);
@@ -172,7 +163,6 @@ app.post('/api/Ingredientes/nuevo', asyncHandler(async (req, res) => {
     return res.status(409).json({ mensaje: 'Ya existe un ingrediente con ese nombre.' });
   }
 
-  // Insertar
   const r = await pool.request()
     .input('nombre', sql.NVarChar, Nombre)
     .input('activo', sql.Int, Number(Activo))
@@ -186,7 +176,6 @@ app.post('/api/Ingredientes/nuevo', asyncHandler(async (req, res) => {
   return res.status(201).json({ mensaje: 'Ingrediente registrado correctamente', id: r.recordset[0].id });
 }));
 
-// PUT api/Ingredientes/actualizar/{id} → { mensaje }  :contentReference[oaicite:9]{index=9}
 app.put('/api/Ingredientes/actualizar/:id', asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const data = req.body || {};
@@ -195,7 +184,6 @@ app.put('/api/Ingredientes/actualizar/:id', asyncHandler(async (req, res) => {
   const pool = await getPool();
   if (!pool) return res.json({ mensaje: 'Ingrediente actualizado correctamente' });
 
-  // Validar nombre único
   const dup = await pool.request()
     .input('nombre', sql.NVarChar, Nombre)
     .input('id', sql.Int, id)
@@ -221,7 +209,6 @@ app.put('/api/Ingredientes/actualizar/:id', asyncHandler(async (req, res) => {
   res.json({ mensaje: 'Ingrediente actualizado correctamente' });
 }));
 
-// GET api/Ingredientes/activos → [{ Clave, Nombre, Descripcion }]  :contentReference[oaicite:10]{index=10}
 app.get('/api/Ingredientes/activos', asyncHandler(async (req, res) => {
   const pool = await getPool();
   if (!pool) {
@@ -242,7 +229,6 @@ app.get('/api/Ingredientes/activos', asyncHandler(async (req, res) => {
 // ============================================================
 // ====================  FORMULAS (FormulasController) ========
 // ============================================================
-// GET api/Formulas/activas → [{ nombre }]  :contentReference[oaicite:11]{index=11}
 app.get('/api/Formulas/activas', asyncHandler(async (req, res) => {
   const pool = await getPool();
   if (!pool) return res.json([{ nombre: 'PT-001' }, { nombre: 'PT-002' }]);
@@ -258,7 +244,6 @@ app.get('/api/Formulas/activas', asyncHandler(async (req, res) => {
 // ============================================================
 // ======================= LOTES (LotesController) ============
 // ============================================================
-// POST api/lotes/programar → { mensaje } (201)  :contentReference[oaicite:12]{index=12}
 app.post('/api/lotes/programar', asyncHandler(async (req, res) => {
   const { FormulaId, Fecha, Cantidad, Peso, UsuarioProgramo } = req.body || {};
   if (!FormulaId || !Fecha || !Cantidad || !Peso) {
@@ -280,7 +265,6 @@ app.post('/api/lotes/programar', asyncHandler(async (req, res) => {
 // ============================================================
 // ============ LOTES PROGRAMADOS (LotesProgramadosController) =
 // ============================================================
-// GET /lotesprogramados?inicio=YYYY-MM-DD&fin=YYYY-MM-DD → lista  :contentReference[oaicite:13]{index=13}
 app.get('/lotesprogramados', asyncHandler(async (req, res) => {
   const { inicio, fin } = req.query;
   if (!inicio || !fin) return res.status(400).json({ error: 'params_required' });
@@ -330,10 +314,7 @@ app.get('/unidadesdemedida/activas', asyncHandler(async (req, res) => {
   res.json(rows.recordset || []);
 }));
 
-
-
-// POST /lotesprogramados/programar → { mensaje } (201)  :contentReference[oaicite:14]{index=14}
-// POST /lotesprogramados/programar  (con unidad de medida)
+// POST /lotesprogramados/programar (con unidad de medida)
 app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
   const {
     CodigoProducto,
@@ -341,14 +322,12 @@ app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
     UsuarioProgramo,
     CantidadLotes,
     PesoPorLote,
-    UnidadMedidaId,   // nombre preferido desde el front
-    IdUnidadMedida    // alias aceptado
+    UnidadMedidaId,
+    IdUnidadMedida
   } = req.body || {};
 
-  // Normaliza unidad (acepta ambos nombres)
   const unidadId = Number(UnidadMedidaId ?? IdUnidadMedida);
 
-  // Validaciones mínimas (directas y sin rodeos)
   if (!CodigoProducto || !FechaProgramada || !UsuarioProgramo ||
       !CantidadLotes || !PesoPorLote || !Number.isFinite(unidadId) || unidadId <= 0) {
     return res.status(400).json({ mensaje: '❌ Error al programar', detalle: 'Parámetros incompletos o inválidos' });
@@ -356,11 +335,9 @@ app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
 
   const pool = await getPool();
   if (!pool) {
-    // Sin conexión real: simula ok para no bloquear pruebas de front
     return res.status(201).json({ mensaje: '✅ Lotes programados correctamente (sin pool)' });
   }
 
-  // (Opcional pero recomendable) Valida que la unidad exista y esté activa
   const um = await pool.request()
     .input('Id', sql.Int, unidadId)
     .query(`
@@ -372,7 +349,6 @@ app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
     return res.status(400).json({ mensaje: '❌ Unidad de medida inválida o inactiva' });
   }
 
-  // Ejecuta el SP con el nuevo parámetro @IdUnidadMedida
   await pool.request()
     .input('CodigoProducto',  sql.NVarChar, String(CodigoProducto))
     .input('FechaProgramada', sql.DateTime, new Date(FechaProgramada))
@@ -385,8 +361,7 @@ app.post('/lotesprogramados/programar', asyncHandler(async (req, res) => {
   res.status(201).json({ mensaje: '✅ Lotes programados correctamente' });
 }));
 
-
-// GET /lotesprogramados/detallelote?consecutivo=... → { detalle, maxSecuencia }  :contentReference[oaicite:15]{index=15}
+// GET /lotesprogramados/detallelote?consecutivo=... → { detalle, maxSecuencia }
 app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
   const consecutivo = req.query.consecutivo ? Number(req.query.consecutivo) : null;
   if (!consecutivo) return res.status(400).json({ error: 'consecutivo_required' });
@@ -409,7 +384,6 @@ app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
     });
   }
 
-  // 1) Ingrediente pendiente (TOP 1 por Secuencia)
   const det = await pool.request()
     .input('Consecutivo', sql.BigInt, consecutivo)
     .query(`
@@ -427,12 +401,12 @@ app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
       LEFT JOIN ProgramacionProduccion_Control b ON a.Consecutivo = b.Consecutivo
       LEFT JOIN ProgramacionProduccion_Detalle c ON a.Consecutivo = c.Consecutivo
       LEFT JOIN Ingredientes i ON c.Ingrediente = i.Identificador
+      LEFT JOIN ProductosTerminados pt ON a.Producto = pt.CodigoProducto
       WHERE a.Consecutivo = @Consecutivo
         AND c.TiempoDePesado IS NULL
       ORDER BY c.Secuencia;
     `);
 
-  // 2) Secuencia máxima
   const max = await pool.request()
     .input('Consecutivo', sql.BigInt, consecutivo)
     .query(`SELECT MAX(Secuencia) AS maxSecuencia FROM ProgramacionProduccion_Detalle WHERE Consecutivo = @Consecutivo;`);
@@ -442,7 +416,6 @@ app.get('/lotesprogramados/detallelote', asyncHandler(async (req, res) => {
     maxSecuencia: max.recordset[0]?.maxSecuencia ?? 0
   });
 }));
-
 
 // POST /lotesprogramados/eliminar → { eliminados, rowsAffected }
 app.post('/lotesprogramados/eliminar', asyncHandler(async (req, res) => {
@@ -483,7 +456,6 @@ app.delete('/lotesprogramados/:consecutivo', asyncHandler(async (req, res) => {
   res.json({ ok: true, rowsAffected: r.rowsAffected });
 }));
 
-
 // POST /lotesprogramados/eliminar-rango → { eliminados }
 app.post('/lotesprogramados/eliminar-rango', asyncHandler(async (req, res) => {
   const inicioRaw = req.body?.inicio || req.query?.inicio;
@@ -509,7 +481,7 @@ app.post('/lotesprogramados/eliminar-rango', asyncHandler(async (req, res) => {
       FROM ProgramacionProduccion a
       INNER JOIN ProgramacionProduccion_Control b ON a.Consecutivo = b.Consecutivo
       WHERE CAST(b.FechaProgramada AS DATE) BETWEEN @inicio AND @fin
-     AND ISNULL(b.LoteCompletado, 0) = 0
+        AND ISNULL(b.LoteCompletado, 0) = 0
         AND b.ProduccionInicio IS NULL
         AND ISNULL(a.Cancelado, 0) = 0;
     `);
@@ -520,9 +492,8 @@ app.post('/lotesprogramados/eliminar-rango', asyncHandler(async (req, res) => {
 // ============================================================
 // =================== PESAJE (PesoController) =================
 // ============================================================
-// POST /peso → { mensaje } (actualiza detalle, marca inicio/final si aplica)  :contentReference[oaicite:16]{index=16}
+// POST /peso → registra y devuelve siguiente pendiente
 app.post('/peso', asyncHandler(async (req, res) => {
-  const data = req.body || {};
   const {
     Consecutivo,
     ProductoTerminado,
@@ -532,7 +503,7 @@ app.post('/peso', asyncHandler(async (req, res) => {
     Peso,
     Etiqueta,
     FotoBase64
-  } = data;
+  } = req.body || {};
 
   if (
     Consecutivo == null || !ProductoTerminado || Secuencia == null ||
@@ -542,83 +513,129 @@ app.post('/peso', asyncHandler(async (req, res) => {
   }
 
   const pool = await getPool();
-  if (!pool) return res.status(201).json({ mensaje: '✅ Peso registrado con éxito.' });
+  if (!pool) {
+    return res.status(201).json({
+      ok: true, mensaje: '✅ Peso registrado', remaining: 0, completed: false, next: null, mock: true
+    });
+  }
 
-  // Decodificar foto base64 (opcional)
+  // Foto opcional
   let fotoBytes = null;
   if (FotoBase64) {
-    let base64 = String(FotoBase64);
-    if (base64.includes(',')) base64 = base64.substring(base64.indexOf(',') + 1);
-    try { fotoBytes = Buffer.from(base64, 'base64'); } catch { fotoBytes = null; }
+    let b64 = String(FotoBase64);
+    if (b64.includes(',')) b64 = b64.substring(b64.indexOf(',') + 1);
+    try { fotoBytes = Buffer.from(b64, 'base64'); } catch { fotoBytes = null; }
   }
 
-  // UPDATE de pesado
-  const upd = await pool.request()
-    .input('tara', sql.Decimal(18, 12), Number(Tara))
-    .input('peso', sql.Decimal(18, 2), Number(Peso))
-    .input('etiqueta', sql.NVarChar(299), Etiqueta ?? '')
-    .input('consecutivo', sql.BigInt, Number(Consecutivo))
-    .input('productoTerminado', sql.NVarChar(40), String(ProductoTerminado).trim())
-    .input('secuencia', sql.Int, Number(Secuencia))
-    .input('ingrediente', sql.NVarChar(50), String(Ingrediente).trim())
-    .input('foto', sql.VarBinary(sql.MAX), fotoBytes ?? null)
-    .query(`
-      UPDATE ProgramacionProduccion_Detalle
-      SET 
-          TaraReal = @tara,
-          PesoReal = @peso,
-          TiempoDePesado = GETDATE(),
-          EtiquetaLeida = @etiqueta,
-          FotoEscaneo = @foto
-      WHERE 
-          Consecutivo = @consecutivo AND 
-          ProductoTerminado = @productoTerminado AND
-          Secuencia = @secuencia AND 
-          Ingrediente = @ingrediente;
-      SELECT @@ROWCOUNT AS rowsAffected;
-    `);
+  const tx = new sql.Transaction(await pool);
+  await tx.begin();
+  try {
+    // 1) Actualiza pesado
+    const rUpd = await new sql.Request(tx)
+      .input('tara', sql.Decimal(18, 12), Number(Tara))
+      .input('peso', sql.Decimal(18, 2), Number(Peso))
+      .input('etiqueta', sql.NVarChar(299), Etiqueta ?? '')
+      .input('consecutivo', sql.BigInt, Number(Consecutivo))
+      .input('productoTerminado', sql.NVarChar(40), String(ProductoTerminado).trim())
+      .input('secuencia', sql.Int, Number(Secuencia))
+      .input('ingrediente', sql.NVarChar(50), String(Ingrediente).trim())
+      .input('foto', sql.VarBinary(sql.MAX), fotoBytes ?? null)
+      .query(`
+        UPDATE ProgramacionProduccion_Detalle
+        SET 
+            TaraReal = @tara,
+            PesoReal = @peso,
+            TiempoDePesado = GETDATE(),
+            EtiquetaLeida = @etiqueta,
+            FotoEscaneo = @foto
+        WHERE 
+            Consecutivo = @consecutivo AND 
+            ProductoTerminado = @productoTerminado AND
+            Secuencia = @secuencia AND 
+            Ingrediente = @ingrediente;
+        SELECT @@ROWCOUNT AS rowsAffected;
+      `);
 
-  if (upd.recordset[0]?.rowsAffected === 0) {
-    return res.status(404).json({ mensaje: '❌ No se encontró el registro para actualizar.' });
-  }
+    if (rUpd.recordset[0]?.rowsAffected === 0) {
+      await tx.rollback();
+      return res.status(404).json({ mensaje: '❌ No se encontró el registro para actualizar.' });
+    }
 
-  // Si Secuencia == 1 → establecer ProduccionInicio si está NULL
-  if (Number(Secuencia) === 1) {
-    await pool.request()
+    // 2) Marca inicio si aplica
+    if (Number(Secuencia) === 1) {
+      await new sql.Request(tx)
+        .input('consecutivo', sql.BigInt, Number(Consecutivo))
+        .query(`
+          UPDATE ProgramacionProduccion_Control
+          SET ProduccionInicio = COALESCE(ProduccionInicio, GETDATE())
+          WHERE Consecutivo = @consecutivo;
+        `);
+    }
+
+    // 3) Pendientes
+    const rPend = await new sql.Request(tx)
       .input('consecutivo', sql.BigInt, Number(Consecutivo))
       .query(`
-        UPDATE ProgramacionProduccion_Control
-        SET ProduccionInicio = GETDATE()
-        WHERE Consecutivo = @consecutivo AND ProduccionInicio IS NULL;
+        SELECT COUNT(*) AS c
+        FROM ProgramacionProduccion_Detalle
+        WHERE Consecutivo = @consecutivo AND TiempoDePesado IS NULL;
       `);
+    const remaining = rPend.recordset[0]?.c ?? 0;
+
+    // 4) Finaliza lote si no quedan
+    let completed = false;
+    if (remaining === 0) {
+      await new sql.Request(tx)
+        .input('consecutivo', sql.BigInt, Number(Consecutivo))
+        .query(`
+          UPDATE ProgramacionProduccion_Control
+          SET ProduccionFinal = GETDATE(), LoteCompletado = 1
+          WHERE Consecutivo = @consecutivo;
+        `);
+      completed = true;
+    }
+
+    // 5) Siguiente ingrediente pendiente
+    let next = null;
+    if (!completed) {
+      const rNext = await new sql.Request(tx)
+        .input('consecutivo', sql.BigInt, Number(Consecutivo))
+        .query(`
+          SELECT TOP 1 
+              a.Consecutivo,
+              a.Producto AS ProductoTerminado,
+              a.ID_Lot   AS LotePT,
+              c.Ingrediente,
+              i.Ingrediente + '; ' + ISNULL(i.Descripcion, '') AS NombreIngrediente,
+              c.PesoProgramado,
+              c.Porcentaje,
+              c.Secuencia
+          FROM ProgramacionProduccion a
+          LEFT JOIN ProgramacionProduccion_Detalle c ON a.Consecutivo = c.Consecutivo
+          LEFT JOIN Ingredientes i ON c.Ingrediente = i.Identificador
+          WHERE a.Consecutivo = @consecutivo AND c.TiempoDePesado IS NULL
+          ORDER BY c.Secuencia;
+        `);
+      next = rNext.recordset[0] || null;
+    }
+
+    await tx.commit();
+    return res.status(201).json({
+      ok: true,
+      mensaje: '✅ Peso registrado con éxito.',
+      remaining,
+      completed,
+      next
+    });
+  } catch (err) {
+    await tx.rollback();
+    throw err;
   }
-
-  // Verificar si ya no hay pendientes para marcar finalizado
-  const pendientes = await pool.request()
-    .input('consecutivo', sql.BigInt, Number(Consecutivo))
-    .query(`
-      SELECT COUNT(*) AS c
-      FROM ProgramacionProduccion_Detalle
-      WHERE Consecutivo = @consecutivo AND TiempoDePesado IS NULL;
-    `);
-
-  if (pendientes.recordset[0]?.c === 0) {
-    await pool.request()
-      .input('consecutivo', sql.BigInt, Number(Consecutivo))
-      .query(`
-        UPDATE ProgramacionProduccion_Control
-        SET ProduccionFinal = GETDATE(), LoteCompletado = 1
-        WHERE Consecutivo = @consecutivo;
-      `);
-  }
-
-  res.status(201).json({ mensaje: '✅ Peso registrado con éxito.' });
 }));
 
 // ============================================================
 // =====  PRODUCTOS TERMINADOS (ProductosTerminadosController) =
 // ============================================================
-// POST api/ProductosTerminados/nuevo → { mensaje } (201)  :contentReference[oaicite:17]{index=17}
 app.post('/api/ProductosTerminados/nuevo', asyncHandler(async (req, res) => {
   const data = req.body || {};
   const { Codigo, Descripcion, ClienteId, NombreCliente, Ingredientes } = data;
@@ -650,7 +667,7 @@ app.post('/api/ProductosTerminados/nuevo', asyncHandler(async (req, res) => {
         .input('CodigoProducto', sql.NVarChar, Codigo)
         .input('Num', sql.Int, num++)
         .input('Ingrediente', sql.NVarChar, String(ing.Clave))
-        .input('Porcentaje', sql.Decimal(18, 5), String(ing.Porcentaje)) // ← solo precisión/valor
+        .input('Porcentaje', sql.Decimal(18, 5), String(ing.Porcentaje))
         .input('Comentario', sql.NVarChar, ing.Comentario ?? null)
         .query(`
           INSERT INTO ProductosTerminados_Detalle (CodigoProducto, NumIngrediente, Ingrediente, Porcentaje, Comentario)
@@ -666,7 +683,6 @@ app.post('/api/ProductosTerminados/nuevo', asyncHandler(async (req, res) => {
   }
 }));
 
-// PUT api/ProductosTerminados/editar/{codigo} → { mensaje }  :contentReference[oaicite:18]{index=18}
 app.put('/api/ProductosTerminados/editar/:codigo', asyncHandler(async (req, res) => {
   const codigo = String(req.params.codigo);
   const data = req.body || {};
@@ -706,7 +722,7 @@ app.put('/api/ProductosTerminados/editar/:codigo', asyncHandler(async (req, res)
         .input('CodigoProducto', sql.NVarChar, codigo)
         .input('Num', sql.Int, num++)
         .input('Ingrediente', sql.NVarChar, String(ing.Clave))
-        .input('Porcentaje', sql.Decimal(18, 5), String(ing.Porcentaje)) // ← solo precisión/valor
+        .input('Porcentaje', sql.Decimal(18, 5), String(ing.Porcentaje))
         .input('Comentario', sql.NVarChar, ing.Comentario ?? null)
         .query(`
           INSERT INTO ProductosTerminados_Detalle (CodigoProducto, NumIngrediente, Ingrediente, Porcentaje, Comentario)
@@ -722,7 +738,6 @@ app.put('/api/ProductosTerminados/editar/:codigo', asyncHandler(async (req, res)
   }
 }));
 
-// GET api/ProductosTerminados/listado → lista con filtros  :contentReference[oaicite:19]{index=19}
 app.get('/api/ProductosTerminados/listado', asyncHandler(async (req, res) => {
   const { codigo = null, cliente = null, nombreCliente = null, activo = null } = req.query;
   const pool = await getPool();
@@ -762,7 +777,6 @@ app.get('/api/ProductosTerminados/listado', asyncHandler(async (req, res) => {
   res.json(r.recordset);
 }));
 
-// GET api/ProductosTerminados/detalle/{codigo} → detalle ingredientes  :contentReference[oaicite:20]{index=20}
 app.get('/api/ProductosTerminados/detalle/:codigo', asyncHandler(async (req, res) => {
   const codigo = String(req.params.codigo);
   const pool = await getPool();
@@ -785,7 +799,6 @@ app.get('/api/ProductosTerminados/detalle/:codigo', asyncHandler(async (req, res
   res.json(r.recordset);
 }));
 
-// GET api/ProductosTerminados/existecodigo?codigo=... → boolean  :contentReference[oaicite:21]{index=21}
 app.get('/api/ProductosTerminados/existecodigo', asyncHandler(async (req, res) => {
   const { codigo } = req.query;
   if (!codigo) return res.status(400).json({ mensaje: 'Error al verificar código' });
@@ -800,7 +813,6 @@ app.get('/api/ProductosTerminados/existecodigo', asyncHandler(async (req, res) =
 // ============================================================
 // ====================== LOGIN (LoginController) =============
 // ============================================================
-// POST /login → { Nombre, Correo, PlanActivo } (BCrypt)  :contentReference[oaicite:22]{index=22}
 app.post('/login', asyncHandler(async (req, res) => {
   const body = req.body || {};
   const Username = body.Username ?? body.username;
@@ -809,7 +821,6 @@ app.post('/login', asyncHandler(async (req, res) => {
 
   const pool = await getPool();
   if (!pool) {
-    // MOCK sencillo
     const ok = Username === 'demo' && Password === 'demo';
     if (!ok) return res.status(401).json({ mensaje: '❌ Usuario o contraseña incorrectos' });
     return res.json({ Nombre: 'Demo', Correo: 'demo@example.com', PlanActivo: true });
